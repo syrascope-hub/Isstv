@@ -110,7 +110,7 @@ jobs:
       - name: Build
         working-directory: ${{ steps.loc.outputs.dir }}
         run: |
-          flutter pub get
+          printf '\ndependency_overrides:\n  package_info_plus: 8.1.1\n' >> pubspec.yaml && flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release
 
