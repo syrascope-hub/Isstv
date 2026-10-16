@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Unzip project if uploaded as zip
+        run: find . -name '*.zip' -not -path './.git/*' -execdir unzip -o -q {} \;
+
       - name: Locate project
         id: loc
         run: |
