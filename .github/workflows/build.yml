@@ -32,7 +32,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.24.5"
+          flutter-version: "3.35.7"
           channel: stable
           cache: true
 
@@ -110,7 +110,7 @@ jobs:
       - name: Build
         working-directory: ${{ steps.loc.outputs.dir }}
         run: |
-          printf '\ndependency_overrides:\n  package_info_plus: 8.1.1\n' >> pubspec.yaml && flutter pub get
+          flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release
 
