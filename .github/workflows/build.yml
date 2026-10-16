@@ -45,7 +45,64 @@ jobs:
 
       - name: Patch android (permissions, desugaring, minSdk)
         working-directory: ${{ steps.loc.outputs.dir }}
-        run: python3 tool/patch_android.py
+        run: |
+          python3 - <<'PYEOF'
+          import pathlib, re, sys
+
+          root = pathlib.Path("android")
+          man = root / "app/src/main/AndroidManifest.xml"
+          s = man.read_text(encoding="utf-8")
+
+          perms = [
+              "android.permission.INTERNET",
+              "android.permission.POST_NOTIFICATIONS",
+              "android.permission.RECEIVE_BOOT_COMPLETED",
+              "android.permission.WAKE_LOCK",
+          ]
+          add = "".join(
+              '    <uses-permission android:name="%s"/>\n' % p
+              for p in perms if p not in s
+          )
+          if add:
+              s = s.replace("<application", add + "    <application", 1)
+          if "usesCleartextTraffic" not in s:
+              s = s.replace("<application", '<application\n        android:usesCleartextTraffic="true"', 1)
+          if "ScheduledNotificationReceiver" not in s:
+              recv = """
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+                  <intent-filter>
+                      <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                      <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                      <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                      <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                  </intent-filter>
+              </receiver>
+          """
+              s = s.replace("</application>", recv + "    </application>", 1)
+          man.write_text(s, encoding="utf-8")
+
+          kts = root / "app/build.gradle.kts"
+          groovy = root / "app/build.gradle"
+          if kts.exists():
+              g = kts.read_text(encoding="utf-8")
+              if "isCoreLibraryDesugaringEnabled" not in g:
+                  g = re.sub(r"(compileOptions\s*\{)", r"\1\n        isCoreLibraryDesugaringEnabled = true", g, count=1)
+                  g += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
+              g = re.sub(r"minSdk\s*=\s*[^\n]+", "minSdk = 23", g)
+              kts.write_text(g, encoding="utf-8")
+          elif groovy.exists():
+              g = groovy.read_text(encoding="utf-8")
+              if "coreLibraryDesugaringEnabled" not in g:
+                  g = re.sub(r"(compileOptions\s*\{)", r"\1\n        coreLibraryDesugaringEnabled true", g, count=1)
+                  g += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'\n}\n"
+              g = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdkVersion 23", g)
+              g = re.sub(r"minSdk(Version)?\s*=?\s*\d+", "minSdkVersion 23", g)
+              groovy.write_text(g, encoding="utf-8")
+          else:
+              sys.exit("build.gradle not found")
+          print("android patched")
+          PYEOF
 
       - name: Build
         working-directory: ${{ steps.loc.outputs.dir }}
