@@ -11,6 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Locate project
+        id: loc
+        run: |
+          P=$(find . -name pubspec.yaml -not -path './.git/*' | head -1)
+          if [ -z "$P" ]; then
+            echo "pubspec.yaml not found. Repo contents:"
+            find . -not -path './.git/*' -type f | head -50
+            exit 1
+          fi
+          echo "dir=$(dirname "$P")" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,8 +33,8 @@ jobs:
           channel: stable
           cache: true
 
-      # توليد مجلد android دون المساس بملفاتنا
       - name: Generate android platform
+        working-directory: ${{ steps.loc.outputs.dir }}
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
           cp -r lib /tmp/lib
@@ -33,13 +44,17 @@ jobs:
           rm -rf test
 
       - name: Patch android (permissions, desugaring, minSdk)
+        working-directory: ${{ steps.loc.outputs.dir }}
         run: python3 tool/patch_android.py
 
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter build apk --release
+      - name: Build
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter build apk --release
 
       - uses: actions/upload-artifact@v4
         with:
           name: iss-sstv-tracker-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ steps.loc.outputs.dir }}/build/app/outputs/flutter-apk/app-release.apk
