@@ -46,6 +46,10 @@ jobs:
           rm -rf lib && cp -r /tmp/lib lib
           rm -rf test
 
+      - name: Apply app icon
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: cp -r tool/res/. android/app/src/main/res/
+
       - name: Patch android (permissions, desugaring, minSdk)
         working-directory: ${{ steps.loc.outputs.dir }}
         run: |
@@ -55,6 +59,7 @@ jobs:
           root = pathlib.Path("android")
           man = root / "app/src/main/AndroidManifest.xml"
           s = man.read_text(encoding="utf-8")
+          s = re.sub(r'android:label="[^"]*"', 'android:label="ISS SSTV"', s, count=1)
 
           perms = [
               "android.permission.INTERNET",
